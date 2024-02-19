@@ -3,9 +3,7 @@
 
 # Directory Structure:
 
-
-![image](https://github.com/KarthiCholan/Ansible/assets/108706606/0fa7885f-4d35-420e-a21e-992345bd7ed8)
-
+![image](https://github.com/KarthiCholan/Ansible/assets/108706606/12a11b63-fb90-49a6-825d-484f6f1bb00c)
 
 
 

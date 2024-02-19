@@ -1,0 +1,7 @@
+---
+- name: Deploy Prometheus and Grafana
+  hosts: monitoring_servers
+  become: true
+  roles:
+    - prometheus
+    - grafana

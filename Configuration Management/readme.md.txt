@@ -1,4 +1,4 @@
-The playbook installs Nginx on the target servers.
+# The playbook installs Nginx on the target servers.
 Ensures the Nginx service is enabled and started.
 Creates a custom Nginx configuration file tailored for a Java application.
 Creates an Nginx username and password file for securing the /admin location.

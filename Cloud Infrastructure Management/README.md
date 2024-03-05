@@ -1,4 +1,4 @@
-#Encrypt the vault file:
+# Encrypt the vault file:
 
 
 ansible-vault encrypt vault_aws_creds.yml

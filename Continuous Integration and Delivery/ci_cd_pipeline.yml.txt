@@ -1,0 +1,47 @@
+# ci_cd_pipeline.yml
+
+---
+- name: CI/CD Pipeline for Java Application
+  hosts: ci_cd_server
+  become: yes
+
+  vars:
+    java_app_name: "example-app"
+    java_app_version: "1.0.0"
+    tomcat_user: "your_tomcat_user"
+    tomcat_password: "{{ vault_tomcat_password | mandatory }}"
+    testing_environment: "testing"
+    production_environment: "production"
+
+  tasks:
+    - name: Build the Java application
+      shell: /path/to/your/build/script.sh
+      environment:
+        JAVA_HOME: "/path/to/your/java/home"
+
+    - name: Run unit tests and integration tests
+      shell: /path/to/your/test/script.sh
+      environment:
+        JAVA_HOME: "/path/to/your/java/home"
+
+    - name: Deploy to testing environment
+      copy:
+        src: /path/to/your/target/{{ java_app_name }}-{{ java_app_version }}.war
+        dest: /opt/tomcat/webapps/{{ java_app_name }}-{{ java_app_version }}.war
+      notify:
+        - Restart Tomcat
+
+    - name: Run acceptance tests (replace with actual acceptance test commands)
+
+    - name: Deploy to production environment
+      copy:
+        src: /path/to/your/target/{{ java_app_name }}-{{ java_app_version }}.war
+        dest: /opt/tomcat/webapps/{{ java_app_name }}-{{ java_app_version }}.war
+      notify:
+        - Restart Tomcat
+
+  handlers:
+    - name: Restart Tomcat
+      service:
+        name: tomcat
+        state: restarted

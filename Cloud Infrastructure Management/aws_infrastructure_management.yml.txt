@@ -1,0 +1,119 @@
+# aws_infrastructure_management.yml
+
+---
+- name: AWS Infrastructure Management for Java Application
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    aws_access_key: "{{ vault_aws_access_key | mandatory }}"
+    aws_secret_key: "{{ vault_aws_secret_key | mandatory }}"
+    aws_region: "your_aws_region"
+    java_app_name: "example-app"
+    java_app_version: "1.0.0"
+    key_pair_name: "your_key_pair_name"
+    security_group_name: "java-app-sg"
+    instance_type: "t2.micro"
+    ami_id: "your_ami_id"
+    load_balancer_name: "java-app-lb"
+    load_balancer_port: 80
+    target_group_name: "java-app-tg"
+    target_port: 8080
+
+  tasks:
+    - name: Provision EC2 instances
+      ec2_instance:
+        name: "{{ java_app_name }}-instance"
+        key_name: "{{ key_pair_name }}"
+        group: "{{ security_group_name }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        region: "{{ aws_region }}"
+        count: 2
+        wait: true
+        vpc_subnet_id: "your_subnet_id"
+        assign_public_ip: true
+        instance_tags:
+          - key: Name
+            value: "{{ java_app_name }}-instance"
+      register: ec2_instances
+
+    - name: Wait for instances to be running
+      wait_for:
+        host: "{{ item.public_ip }}"
+        port: 22
+        timeout: 300
+      with_items: "{{ ec2_instances.instances }}"
+
+    - name: Configure security group
+      ec2_group:
+        name: "{{ security_group_name }}"
+        description: "Security group for Java application"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp
+            from_port: 8080
+            to_port: 8080
+            cidr_ip: 0.0.0.0/0
+
+    - name: Install Java on instances
+      become: yes
+      become_user: ec2-user
+      raw: "yum install -y java-1.8.0-openjdk"
+
+    - name: Configure load balancer
+      ec2_elbv2_lb:
+        name: "{{ load_balancer_name }}"
+        region: "{{ aws_region }}"
+        subnets:
+          - "your_subnet_id"
+        security_groups:
+          - "{{ security_group_name }}"
+        state: present
+
+    - name: Configure target group
+      ec2_elbv2_target_group:
+        name: "{{ target_group_name }}"
+        protocol: HTTP
+        port: "{{ target_port }}"
+        vpc_id: "your_vpc_id"
+        health_check_path: "/"
+        health_check_port: "{{ target_port }}"
+        health_check_protocol: HTTP
+        successful_response_codes: "200-299"
+        deregistration_delay_timeout: 300
+        targets:
+          - id: "{{ item.id }}"
+            port: "{{ target_port }}"
+      with_items: "{{ ec2_instances.instances }}"
+
+    - name: Register targets with the load balancer
+      ec2_elbv2_target:
+        target_group_arn: "{{ target_group_name }}"
+        targets:
+          - id: "{{ item.id }}"
+            port: "{{ target_port }}"
+      with_items: "{{ ec2_instances.instances }}"
+
+  vars_files:
+    - vault_aws_creds.yml
+
+  handlers:
+    - name: Wait for instances to be in-service
+      ec2_elbv2_target_group_facts:
+        name: "{{ target_group_name }}"
+        region: "{{ aws_region }}"
+      register: target_group_facts
+
+    - name: Wait for instances to be in-service
+      wait_for:
+        timeout: 300
+        sleep: 10
+        delay: 10
+        host: "{{ item.target }}"
+        port: "{{ target_port }}"
+      with_items: "{{ target_group_facts.target_groups[0].targets }}"

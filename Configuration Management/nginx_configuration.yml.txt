@@ -1,0 +1,44 @@
+# nginx_configuration.yml
+
+---
+- name: Configure Nginx Servers
+  hosts: nginx_servers
+  become: yes
+
+  vars:
+    nginx_user: "your_nginx_user"
+    nginx_password: "{{ vault_nginx_password | mandatory }}"
+    java_app_domain: "example.com"
+    java_app_port: 8080
+
+  tasks:
+    - name: Install Nginx
+      yum:
+        name: nginx
+        state: present
+
+    - name: Ensure Nginx service is enabled and started
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Create Nginx configuration file
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/conf.d/java_app.conf
+      notify:
+        - Reload Nginx
+
+    - name: Create Nginx username and password file
+      htpasswd:
+        path: /etc/nginx/.htpasswd
+        name: "{{ nginx_user }}"
+        password: "{{ nginx_password }}"
+        crypt_scheme: sha512
+
+  handlers:
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded

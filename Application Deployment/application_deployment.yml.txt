@@ -1,0 +1,52 @@
+# application_deployment.yml
+
+---
+- name: Deploy Java Web Application
+  hosts: app_servers
+  become: yes
+
+  vars:
+    java_app_name: "example-app"
+    java_app_version: "1.0.0"
+    tomcat_user: "your_tomcat_user"
+    tomcat_password: "{{ vault_tomcat_password | mandatory }}"
+    database_user: "your_database_user"
+    database_password: "{{ vault_database_password | mandatory }}"
+    database_host: "localhost"
+    database_name: "example_db"
+
+  tasks:
+    - name: Install Java
+      yum:
+        name: java-1.8.0-openjdk
+        state: present
+
+    - name: Deploy Tomcat (Assuming Tomcat is pre-installed)
+      copy:
+        src: files/{{ java_app_name }}-{{ java_app_version }}.war
+        dest: /opt/tomcat/webapps/
+      notify:
+        - Restart Tomcat
+
+    - name: Configure Tomcat users
+      lineinfile:
+        path: /opt/tomcat/conf/tomcat-users.xml
+        line: '<user username="{{ tomcat_user }}" password="{{ tomcat_password }}" roles="manager-gui,admin-gui"/>'
+      notify:
+        - Restart Tomcat
+
+    - name: Configure application properties
+      template:
+        src: templates/application.properties.j2
+        dest: /opt/tomcat/webapps/{{ java_app_name }}-{{ java_app_version }}/WEB-INF/classes/application.properties
+
+    - name: Configure database
+      template:
+        src: templates/database.properties.j2
+        dest: /opt/tomcat/webapps/{{ java_app_name }}-{{ java_app_version }}/WEB-INF/classes/database.properties
+
+  handlers:
+    - name: Restart Tomcat
+      service:
+        name: tomcat
+        state: restarted

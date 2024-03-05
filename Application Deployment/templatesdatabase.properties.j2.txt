@@ -1,0 +1,4 @@
+# Database Properties
+database.user={{ database_user }}
+database.password={{ database_password }}
+database.url=jdbc:mysql://{{ database_host }}/{{ database_name }}

@@ -1,0 +1,2 @@
+vault_switch_username: "your_switch_username"
+vault_switch_password: "your_switch_password"

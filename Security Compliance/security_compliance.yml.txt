@@ -1,0 +1,72 @@
+# security_compliance.yml
+
+---
+- name: Security Compliance for Java Application
+  hosts: pci_dss_servers
+  become: yes
+
+  vars:
+    firewall_ports:
+      - 22
+      - 80
+      - 443
+    ssh_ciphers:
+      - aes256
+      - aes128
+    ssh_macs:
+      - hmac-sha2-512
+      - hmac-sha2-256
+    encrypted_mounts:
+      - '/var'
+
+  tasks:
+    - name: Ensure firewall is properly configured
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: yes
+        immediate: yes
+      with_items: "{{ firewall_ports }}"
+      notify:
+        - Restart Firewalld
+
+    - name: Check for open ports and services
+      shell: ss -tulwn
+      register: open_ports
+
+    - name: Fail if unauthorized open ports are found
+      fail:
+        msg: "Security Violation: Unauthorized open ports found - {{ open_ports.stdout }}"
+      when: "'22' not in open_ports.stdout_lines and '80' not in open_ports.stdout_lines and '443' not in open_ports.stdout_lines"
+
+    - name: Ensure SSH encryption is configured securely
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        line: "{{ item }}"
+      with_items:
+        - "Ciphers {{ ssh_ciphers | join(',') }}"
+        - "MACs {{ ssh_macs | join(',') }}"
+      notify:
+        - Restart SSH
+
+    - name: Ensure data at rest encryption is enabled for specified directories
+      get_fact:
+        fact: 'mounts'
+      register: mount_facts
+
+    - name: Fail if data at rest encryption is not enabled
+      fail:
+        msg: "Security Violation: Data at rest encryption not enabled for {{ item }}"
+      when: "'{{ item }}' in mount_facts.mounts and 'encryption' not in mount_facts.mounts['{{ item }}'].options"
+      with_items: "{{ encrypted_mounts }}"
+
+  handlers:
+    - name: Restart Firewalld
+      service:
+        name: firewalld
+        state: restarted
+
+    - name: Restart SSH
+      service:
+        name: sshd
+        state: restarted

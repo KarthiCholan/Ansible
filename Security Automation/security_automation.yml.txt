@@ -1,0 +1,72 @@
+# security_automation.yml
+
+---
+- name: Security Automation for Java Application
+  hosts: java_app_servers
+  become: yes
+
+  vars:
+    ssh_user: "your_ssh_user"
+    ssh_password: "{{ vault_ssh_password | mandatory }}"
+    java_app_name: "example-app"
+    firewall_allowed_ports:
+      - 22
+      - 80
+      - 443
+    unnecessary_services:
+      - telnet
+      - ftp
+      - sendmail
+    system_users:
+      - name: "secure_user"
+        state: "present"
+        groups: "wheel"
+        append: yes
+    sudoers_file: "/etc/sudoers.d/java_app_sudoers"
+    sudoers_content: |
+      {{ ssh_user }} ALL=(ALL) NOPASSWD: /path/to/java_app_script.sh
+
+  tasks:
+    - name: Ensure the firewall is configured
+      firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: yes
+        immediate: yes
+      with_items: "{{ firewall_allowed_ports }}"
+      notify:
+        - Restart Firewalld
+
+    - name: Disable unnecessary services
+      systemd:
+        name: "{{ item }}"
+        enabled: no
+        masked: yes
+        state: stopped
+      with_items: "{{ unnecessary_services }}"
+
+    - name: Ensure specific system users are created
+      user:
+        name: "{{ item.name }}"
+        state: "{{ item.state }}"
+        groups: "{{ item.groups }}"
+        append: "{{ item.append | default(omit) }}"
+      with_items: "{{ system_users }}"
+
+    - name: Ensure sudoers file is present
+      template:
+        src: templates/java_app_sudoers.j2
+        dest: "{{ sudoers_file }}"
+      notify:
+        - Restart Sudo
+
+  handlers:
+    - name: Restart Firewalld
+      service:
+        name: firewalld
+        state: restarted
+
+    - name: Restart Sudo
+      service:
+        name: sudo
+        state: restarted

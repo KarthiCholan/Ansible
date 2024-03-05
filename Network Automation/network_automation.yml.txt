@@ -1,0 +1,89 @@
+# network_automation.yml
+
+---
+- name: Network Automation for Java Application
+  hosts: network_switches
+  gather_facts: false
+
+  vars:
+    switch_username: "{{ vault_switch_username | mandatory }}"
+    switch_password: "{{ vault_switch_password | mandatory }}"
+    vlans:
+      - id: 10
+        name: "Data_VLAN"
+      - id: 20
+        name: "Voice_VLAN"
+    acl_name: "example_acl"
+    acl_rules:
+      - permit tcp any any eq 80
+      - permit udp any any eq 443
+    routing_protocol: "ospf"
+    ospf_router_id: "1.1.1.1"
+    ospf_networks:
+      - "192.168.1.0/24"
+      - "10.0.0.0/24"
+
+  tasks:
+    - name: Configure VLANs
+      ios_config:
+        lines:
+          - "vlan {{ item.id }}"
+          - " name {{ item.name }}"
+      with_items: "{{ vlans }}"
+      become: yes
+      become_method: enable
+      become_password: "{{ switch_password }}"
+      provider:
+        host: "{{ inventory_hostname }}"
+        username: "{{ switch_username }}"
+        password: "{{ switch_password }}"
+        transport: cli
+
+    - name: Configure ACL
+      ios_config:
+        lines:
+          - "ip access-list extended {{ acl_name }}"
+          - "{{ item }}"
+      with_items: "{{ acl_rules }}"
+      become: yes
+      become_method: enable
+      become_password: "{{ switch_password }}"
+      provider:
+        host: "{{ inventory_hostname }}"
+        username: "{{ switch_username }}"
+        password: "{{ switch_password }}"
+        transport: cli
+
+    - name: Apply ACL to interfaces
+      ios_config:
+        lines:
+          - "interface range GigabitEthernet0/1 - 24"
+          - " ip access-group {{ acl_name }} in"
+      become: yes
+      become_method: enable
+      become_password: "{{ switch_password }}"
+      provider:
+        host: "{{ inventory_hostname }}"
+        username: "{{ switch_username }}"
+        password: "{{ switch_password }}"
+        transport: cli
+
+    - name: Configure OSPF
+      ios_config:
+        lines:
+          - "router ospf 1"
+          - " router-id {{ ospf_router_id }}"
+          - " network {{ item }}"
+      with_items: "{{ ospf_networks }}"
+      become: yes
+      become_method: enable
+      become_password: "{{ switch_password }}"
+      provider:
+        host: "{{ inventory_hostname }}"
+        username: "{{ switch_username }}"
+        password: "{{ switch_password }}"
+        transport: cli
+
+  vars_files:
+    - vault_switch_creds.yml
+

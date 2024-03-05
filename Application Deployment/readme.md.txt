@@ -1,4 +1,4 @@
-To encrypt the sensitive information using Ansible Vault:
+##  To encrypt the sensitive information using Ansible Vault:
 
 bash
 Copy code
